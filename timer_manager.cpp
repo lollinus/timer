@@ -9,7 +9,7 @@
 
 timer_manager::TimerId const timer_manager::empty = std::numeric_limits<timer_manager::TimerId>::max();
 //timer_manager* timer_manager::instance = 0;
-//boost::mutex 	timer_manager::instance_mutex;
+//boost::mutex	timer_manager::instance_mutex;
 
 //timer_manager& timer_manager::get() {
 //	if(!instance) {
@@ -38,9 +38,9 @@ timer_manager::~timer_manager() {
 }
 
 timer_manager::TimerId timer_manager::add_timer(timer_manager::Timeout t, Action const& a) {
-	boost::mutex::scoped_lock accessGuard(timeout_mutex_);	
+	boost::mutex::scoped_lock accessGuard(timeout_mutex_);
 	timer_ptr p_timer(new timer(++timer_id, a));
-	TimeoutMap::iterator timer_it = timeouts_.insert(std::make_pair(t, p_timer)); 
+	TimeoutMap::iterator timer_it = timeouts_.insert(std::make_pair(t, p_timer));
 	return timer_it->second->id;
 }
 
@@ -119,11 +119,13 @@ int main(int argc, char** argv)
 
 	manager->add_timer(1000, TimePrint());
 	manager->add_timer(2000, TimePrint());
+
+	boost::thread manager_thread(manager);
 	manager->add_timer(3000, TimePrint());
 	manager->add_timer(1000, SelfExtend(manager));
 	manager->add_timer(10000, Finish(manager));
 
-
+	manager_thread.join();
 	return 0;
 }
 #endif // _TEST_
