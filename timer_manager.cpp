@@ -1,9 +1,9 @@
 /* -*- mode: c++; tab-width: 8; indent-tabs-mode: t; -*-
-   vim: ts=8 sw=8 sts=8 noet:
+   vim: ts=8 sw=8 sts=8 noet foldmethod=marker:
  */
 /**
-*
-*/
+ *
+ */
 #include "timer_manager.hpp"
 #include <boost/function.hpp>
 
@@ -22,20 +22,20 @@ timer_manager::TimerId const timer_manager::empty = std::numeric_limits<timer_ma
 //}
 
 /** simple container to keep one timer  */
-struct timer {
+struct timer { // {{{
 	timer_manager::TimerId id;
 	timer_manager::Action action;
-}
+} // }}}
 
-timer_manager::timer_manager()
+timer_manager::timer_manager() // {{{
 	: timeouts_()
 	, last_timer_(0)
 	, timeouts_mutex_()
 {
-}
+} // }}}
 
-timer_manager::~timer_manager() {
-}
+timer_manager::~timer_manager() { // {{{
+} // }}}
 
 timer_manager::TimerId timer_manager::add_timer(timer_manager::Timeout t, Action const& a) {
 	boost::mutex::scoped_lock accessGuard(timeout_mutex_);
@@ -73,12 +73,13 @@ bool timer_manager::cancel_timer(timer_manager::TimerId id) {
 #include <iostream>
 #include <boost/scoped_ptr.hpp>
 
+/** simple timer action to print value on console */
 struct TimePrint {
 	void operator()(timer_manager::TimerId id) const {
 		std::cout << "timer " << id << std::endl;
 	}
 }
-
+/** simple timer action to extend its timer */
 struct SelfExtend {
 	SelfExtend(boost::shared_ptr<timer_manager> manager)
 		: manager_(manager)
@@ -95,9 +96,9 @@ struct SelfExtend {
 private:
 	boost::weak_ptr<timer_manager> manager_;
 }
-
-struct Finish {
-	Finish(boost::shared_ptr<timer_manager> manager)
+/** timer action which will execute stop call on timer manager to stop timer work */
+struct TimerManagerFinish {
+	TimerManagerFinish(boost::shared_ptr<timer_manager> manager)
 		: manager_(manager)
 	{ }
 	void operator()(timer_manager::TimerId id) const {
@@ -113,8 +114,7 @@ private:
 	boost::weak_ptr<timer_manager> manager_;
 }
 
-int main(int argc, char** argv)
-{
+int main(int argc, char** argv) {
 	boost::shared_ptr<timer_manager> manager;
 
 	manager->add_timer(1000, TimePrint());
@@ -123,7 +123,9 @@ int main(int argc, char** argv)
 	boost::thread manager_thread(manager);
 	manager->add_timer(3000, TimePrint());
 	manager->add_timer(1000, SelfExtend(manager));
-	manager->add_timer(10000, Finish(manager));
+	manager->add_timer(10000, TimerManagerFinish(manager));
+
+	sleep(10);
 
 	manager_thread.join();
 	return 0;
