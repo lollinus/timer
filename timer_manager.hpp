@@ -8,10 +8,16 @@
 #ifndef _TIMER_MANAGER_HPP_
 #define _TIMER_MANAGER_HPP_
 
+// STL libraries
+#include <ctime>
 #include <limits>
+#include <map>
 
+// Boost includes
 #include <boost/noncopyable.hpp>
-#include <boost/mutex.hpp>
+#include <boost/thread/mutex.hpp>
+#include <boost/shared_ptr.hpp>
+#include <boost/function.hpp>
 
 /** @struct timer
  * @brief struct used to store timers with actions for timer manager
@@ -22,7 +28,7 @@ typedef boost::shared_ptr<timer> timer_ptr;
 class timer_manager : boost::noncopyable {
 public:
 	typedef unsigned long				TimerId;
-	typedef unsigned long				Timeout;
+	typedef time_t					Timeout;
 	typedef boost::function<void *(TimerId)>	Action;
 
 	/** @typedef std::multimap<Timeout, timer_ptr>  TimeoutMap
@@ -32,6 +38,8 @@ public:
 	 * @todo probably timers should be "rounded" when added to timer_manager to minimize wakeup count (e.g. 0.1 second timer groups)
 	 */
 	typedef std::multimap<Timeout, timer_ptr>	TimeoutMap;
+	typedef TimeoutMap::iterator			TimeoutIterator;
+	typedef TimeoutMap::const_iterator		ConstTimeoutIterator;
 
 	static TimerId const empty;
 private:
@@ -45,6 +53,8 @@ public:
 	TimerId add_timer(Timeout t, Action const& a); //!< add new timer with action to execute
 	bool cancel_timer(TimerId id); //!< add new timer with action to execute
 
+	void stop();	//!< stop timer manager thread
+
 public:
 	void operator()() const; //!< thread execution function for timer manager
 
@@ -52,10 +62,10 @@ private:
 	TimeoutMap		timeouts_;
 	TimerId			last_timer_;
 	mutable boost::mutex	timeouts_mutex_;
+	boost::condition	wait_condition_; //!< condition used by timer_manager thread to wait
 
-//private:
-//	static timer_manager*	instance;
-//	static boost::mutex	instance_mutex;
+	mutable boost::mutex	manager_mutex_;	//!< mutex protecting internal timer_manager state
+	bool			is_stopping_;	//!< flag indicating that timer_manager is stopping
 };
 
 #endif // include guard
