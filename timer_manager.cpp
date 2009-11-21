@@ -5,7 +5,10 @@
  *
  */
 #include "timer_manager.hpp"
+
+// Boost libraries
 #include <boost/function.hpp>
+#include <boost/weak_ptr.hpp>
 
 timer_manager::TimerId const timer_manager::empty = std::numeric_limits<timer_manager::TimerId>::max();
 //timer_manager* timer_manager::instance = 0;
@@ -23,6 +26,8 @@ timer_manager::TimerId const timer_manager::empty = std::numeric_limits<timer_ma
 
 /** simple container to keep one timer  */
 struct timer {
+	timer(timer_manager::TimerId p_id, timer_manager::Action const& a)
+		: id(p_id), action(a) {};
 	timer_manager::TimerId id;
 	timer_manager::Action action;
 }
@@ -31,6 +36,9 @@ timer_manager::timer_manager()
 	: timeouts_()
 	, last_timer_(0)
 	, timeouts_mutex_()
+	, wait_condition_()
+	, manager_mutex_()
+	, is_stopping_(false)
 {
 }
 
@@ -38,34 +46,68 @@ timer_manager::~timer_manager() {
 }
 
 timer_manager::TimerId timer_manager::add_timer(timer_manager::Timeout t, Action const& a) {
-	boost::mutex::scoped_lock accessGuard(timeout_mutex_);
-	timer_ptr p_timer(new timer(++timer_id, a));
+	boost::mutex::scoped_lock accessGuard(timeouts_mutex_);
+	timer_ptr p_timer(new timer(++last_timer_, a));
 	TimeoutMap::iterator timer_it = timeouts_.insert(std::make_pair(t, p_timer));
+	wait_condition_.notify_one();
 	return timer_it->second->id;
 }
 
 namespace {
-struct equal_id : std::unary_function<TimeoutMap::value_type, bool> {
+struct equal_id : std::unary_function<timer_manager::TimeoutMap::value_type, bool> {
 	equal_id(timer_manager::TimerId id) : id_(id) {}
-	bool operator()(TimeoutMap::value_type const& v) const {
+	bool operator()(timer_manager::TimeoutMap::value_type const& v) const {
 		if(v.second) {
 			return v.second->id == id_;
 		}
 		return false;
 	}
 	timer_manager::TimerId id_;
-}
+};
 }
 
 bool timer_manager::cancel_timer(timer_manager::TimerId id) {
 	bool result = false;
-	boost::mutex::scoped_lock accessGuard(timeout_mutex_);
+	boost::mutex::scoped_lock accessGuard(timeouts_mutex_);
 	TimeoutMap::iterator timer_it = find_if(timeouts_.begin(), timeouts_.end(), equal_id(id));
 	if(timer_it!=timeouts_.end()) {
 		timeouts_.erase(timer_it);
 		result = true;
 	}
+	wait_condition_.notify_one();
 	return result;
+}
+
+void timer_manager::stop() {
+	boost::mutex::scoped_lock accessGuard(manager_mutex_);
+	is_stopping_ = true;
+}
+
+void timer_manager::operator()() const {
+	using namespace boost::posix_time;
+	for(;;) {
+		{ // check if timer manager is stopping
+		boost::scoped_lock stoppingLock(manager_mutex_);
+		if(is_stopping_) {
+			/// @todo call all left timeouts to notify consumers that operation is closing
+			return;
+		}
+		}
+		{ // serve currently matched timeouts
+		boost::scoped_lock accessGuard(timeouts_mutex_);
+		std::time_t now = time(0);
+		// read current timeouts and execute actions for them
+		std::pair<ConstTimeoutIterator, ConstTimeoutIterator> match_time = timeouts_::equal_range(now);
+		for(ConstTimeoutIterator action_it = timeouts_.begin(); action_it != match_time.second; ++action_it) {
+			action_it->second();
+		}
+		timeouts_.erase(timeouts_.begin(), match_time.second);
+		/// @todo add check if time is not met for next timeout
+		ConstTimeoutIterator next_timeout_it = timeouts_.begin();
+		boost::xtime timeout(next_timeout_it->first);
+		wait_condition_.timed_wait(accessGuard, timeout);
+		}
+	}
 }
 
 #ifdef _TEST_
@@ -87,10 +129,10 @@ struct SelfExtend {
 
 	void operator()(timer_manager::TimerId id) const {
 		std::cout << "timer " << id << std::endl;
-		boost::shared_ptr<timer_manager> mgr = manager.lock();
+		boost::shared_ptr<timer_manager> mgr = manager_.lock();
 		if(mgr) {
 			timer_manager::TimerId new_id = mgr->add_timer(1000, SelfExtend(mgr));
-			std::count << "extended timer(" << id <<") new_id(" << new_id << ")" << std::endl;
+			std::cout << "extended timer(" << id << ") new_id(" << new_id << ")" << std::endl;
 		}
 	}
 private:
@@ -103,7 +145,7 @@ struct TimerManagerFinish {
 	{ }
 	void operator()(timer_manager::TimerId id) const {
 		std::cout << "timer " << id << std::endl;
-		boost::shared_ptr<timer_manager> mgr = manager.lock();
+		boost::shared_ptr<timer_manager> mgr = manager_.lock();
 		if(mgr) {
 			mgr->stop();
 			std::cout << "stopped timer manager" << std::endl;
