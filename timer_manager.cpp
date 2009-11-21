@@ -1,5 +1,5 @@
 /* -*- mode: c++; tab-width: 8; indent-tabs-mode: t; -*-
-   vim: ts=8 sw=8 sts=8 noet foldmethod=marker:
+   vim: ts=8 sw=8 sts=8 noet foldmethod=syntax:
  */
 /**
  *
@@ -22,20 +22,20 @@ timer_manager::TimerId const timer_manager::empty = std::numeric_limits<timer_ma
 //}
 
 /** simple container to keep one timer  */
-struct timer { // {{{
+struct timer {
 	timer_manager::TimerId id;
 	timer_manager::Action action;
-} // }}}
+}
 
-timer_manager::timer_manager() // {{{
+timer_manager::timer_manager()
 	: timeouts_()
 	, last_timer_(0)
 	, timeouts_mutex_()
 {
-} // }}}
+}
 
-timer_manager::~timer_manager() { // {{{
-} // }}}
+timer_manager::~timer_manager() {
+}
 
 timer_manager::TimerId timer_manager::add_timer(timer_manager::Timeout t, Action const& a) {
 	boost::mutex::scoped_lock accessGuard(timeout_mutex_);
