@@ -1,6 +1,4 @@
-/* -*- mode: c++; tab-width: 8; indent-tabs-mode: t; -*-
-   vim: ts=8 sw=8 sts=8 noet:
- */
+/* -*- mode: c++; tab-width: 8; indent-tabs-mode: t; -*- vim: set ts=8 sw=8 sts=8 noet foldmethod=syntax: */
 /**
  * @file timer_manager.hpp
  *
@@ -16,6 +14,7 @@
 // Boost includes
 #include <boost/noncopyable.hpp>
 #include <boost/thread/mutex.hpp>
+#include <boost/thread/condition_variable.hpp>
 #include <boost/shared_ptr.hpp>
 #include <boost/function.hpp>
 
@@ -29,7 +28,7 @@ class timer_manager : boost::noncopyable {
 public:
 	typedef unsigned long				TimerId;
 	typedef time_t					Timeout;
-	typedef boost::function<void *(TimerId)>	Action;
+	typedef boost::function<void (TimerId)>		Action;
 
 	/** @typedef std::multimap<Timeout, timer_ptr>  TimeoutMap
 	 * @brief map used to store each timeout mapped to it's action.
@@ -42,30 +41,41 @@ public:
 	typedef TimeoutMap::const_iterator		ConstTimeoutIterator;
 
 	static TimerId const empty;
-private:
+public:
 	timer_manager();
 	~timer_manager();
 
 public:
-//	static timer_manager& get(); //!< timer_manager access function
-
-public:
-	TimerId add_timer(Timeout t, Action const& a); //!< add new timer with action to execute
+	/**
+	 * @brief Add new timer with action to execute and action to execute in case of timer cancel
+	 * @par timeout value
+	 * @par timeout_action to be executed when @a timeout is met
+	 * @return TimerId value which can be used to cancel timeout
+	 */
+	TimerId add_timer(Timeout timeout, Action const& action);
+	/**
+	 * @brief Add new timer with action to execute and action to execute in case of timer cancel
+	 * @par timeout value
+	 * @par timeout_action to be executed when @a timeout is met
+	 * @par cancel_action to be executed when @f cancel_timer called
+	 * @return TimerId value which can be used to cancel timeout
+	 */
+	TimerId add_timer(Timeout timeout, Action const& action, Action const& cancel_action);
 	bool cancel_timer(TimerId id); //!< add new timer with action to execute
 
 	void stop();	//!< stop timer manager thread
 
 public:
-	void operator()() const; //!< thread execution function for timer manager
+	void operator()(); //!< thread execution function for timer manager
 
 private:
-	TimeoutMap		timeouts_;
-	TimerId			last_timer_;
-	mutable boost::mutex	timeouts_mutex_;
-	boost::condition	wait_condition_; //!< condition used by timer_manager thread to wait
+	TimeoutMap			timeouts_;	//!< map storing all timeouts handled by manager
+	TimerId				last_timer_;
+	mutable boost::mutex		timeouts_mutex_;
+	boost::condition_variable	wait_condition_; //!< condition used by timer_manager thread to wait
 
-	mutable boost::mutex	manager_mutex_;	//!< mutex protecting internal timer_manager state
-	bool			is_stopping_;	//!< flag indicating that timer_manager is stopping
+	mutable boost::mutex		manager_mutex_;	//!< mutex protecting internal timer_manager state
+	bool				is_stopping_;	//!< flag indicating that timer_manager is stopping
 };
 
 #endif // include guard
