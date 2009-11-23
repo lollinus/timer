@@ -14,7 +14,7 @@
 // Boost includes
 #include <boost/noncopyable.hpp>
 #include <boost/thread/mutex.hpp>
-#include <boost/thread/condition_variable.hpp>
+#include <boost/thread/condition.hpp>
 #include <boost/shared_ptr.hpp>
 #include <boost/function.hpp>
 
@@ -69,10 +69,13 @@ public:
 	void operator()(); //!< thread execution function for timer manager
 
 private:
+	void run_actions(TimeoutMap const& actions) const; //!< run all actions within given container
+
+private:
 	TimeoutMap			timeouts_;	//!< map storing all timeouts handled by manager
 	TimerId				last_timer_;
 	mutable boost::mutex		timeouts_mutex_;
-	boost::condition_variable	wait_condition_; //!< condition used by timer_manager thread to wait
+	boost::condition		wait_condition_; //!< condition used by timer_manager thread to wait
 
 	mutable boost::mutex		manager_mutex_;	//!< mutex protecting internal timer_manager state
 	bool				is_stopping_;	//!< flag indicating that timer_manager is stopping

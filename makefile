@@ -1,8 +1,19 @@
 CXX=g++
-INCLUDE=-I$(HOME)/include -I/usr/local/include
-LIBS_PATH=-L$(HOME)/lib -L/usr/local/lib
-LIBS=-lboost_thread -lpthread
+INCLUDE=-I$(HOME)/include -I/usr/local/include -L/opt/sysincludes/linux64/ix86/sysincludes_1.3/usr/include
+LIBS_PATH=-L/opt/sysincludes/linux64/ix86/sysincludes_1.3/usr/lib64
+LIBS=-lboost_thread 
+OBJECTS=timer_manager.o
+FLAGS=#-DTEST__
+CXXFLAGS=
+LDDFLAGS=
 
-timer_manager_test: timer_manager.cpp timer_manager.hpp
-	$(CXX) -o $@ $(INCLUDE) $(LIBS_PATH) $(LIBS) -D_TEST_ $<
+timer_manager_test: test.o $(OBJECTS)
+	$(CXX) -o $@ $(LIBS_PATH) $(LIBS) $(FLAGS) $(LDDFLAGS) $< $(OBJECTS)
 
+.PHONY: clean
+clean:
+	@rm -rf *.core *.o timer_manager_test
+
+
+%.o: %.cpp %.hpp
+	$(CXX) -c -o $@ $(INCLUDE) $(CXXFLAGS) $(FLAGS) $< 
