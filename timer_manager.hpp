@@ -48,20 +48,25 @@ public:
 public:
 	/**
 	 * @brief Add new timer with action to execute and action to execute in case of timer cancel
-	 * @par timeout value
-	 * @par timeout_action to be executed when @a timeout is met
+	 * @param timeout value
+	 * @param timeout_action to be executed when @a timeout is met
 	 * @return TimerId value which can be used to cancel timeout
 	 */
 	TimerId add_timer(Timeout timeout, Action const& action);
 	/**
 	 * @brief Add new timer with action to execute and action to execute in case of timer cancel
-	 * @par timeout value
-	 * @par timeout_action to be executed when @a timeout is met
-	 * @par cancel_action to be executed when @f cancel_timer called
+	 * @param timeout value
+	 * @param timeout_action to be executed when @a timeout is met
+	 * @param cancel_action to be executed when @f cancel_timer called
 	 * @return TimerId value which can be used to cancel timeout
 	 */
 	TimerId add_timer(Timeout timeout, Action const& action, Action const& cancel_action);
-	bool cancel_timer(TimerId id); //!< add new timer with action to execute
+	/**
+	 * @brief add new timer with action to execute
+	 * @param id timer id which should be cancelled
+	 * @return true if cancelling succeded
+	 */
+	bool cancel_timer(TimerId id);
 
 	void stop();	//!< stop timer manager thread
 

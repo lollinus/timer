@@ -65,17 +65,21 @@ struct equal_id : std::unary_function<timer_manager::TimeoutMap::value_type, boo
 
 bool timer_manager::cancel_timer(timer_manager::TimerId id) {
 	bool result = false;
+	Action a;
+	{ // mutex scope
 	boost::mutex::scoped_lock accessGuard(timeouts_mutex_);
 	TimeoutMap::iterator timer_it = find_if(timeouts_.begin(), timeouts_.end(), equal_id(id));
 	if(timer_it!=timeouts_.end()) {
 		Action a = timer_it->second->cancel_action;
-		if(a) {
-			a(id);
-		}
-		timeouts_.erase(timer_it);
-		result = true;
 	}
+	timeouts_.erase(timer_it);
+	result = true;
 	wait_condition_.notify_one();
+	}
+	// run action after releasing lock to avoid deadlock if action works on timer_manager
+	if(a) {
+		a(id);
+	}
 	return result;
 }
 
@@ -107,7 +111,7 @@ void timer_manager::operator()() {
 		timeouts_.erase(timeouts_.begin(), match_time.second);
 		} // mutex is closed here so if running action is doing something on timer_manager it will nod deadlock
 		run_actions(current_actions);
-		{ // opening scope for mutex 
+		{ // opening scope for mutex
 		boost::mutex::scoped_lock accessGuard(timeouts_mutex_);
 		/// @todo add check if time is not met for next timeout
 		if(!timeouts_.empty()) {
