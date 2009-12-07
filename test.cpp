@@ -1,3 +1,4 @@
+/* -*- mode: c++; tab-width: 8: indent-tabs-mode: t; -*- vim: set ts=8 sts=8 sw=8 tw=80 noet foldmethod=syntax: */
 // STL libraries
 #include <iostream>
 #include <functional>
