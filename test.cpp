@@ -70,6 +70,9 @@ int main(int argc, char** argv) {
 	timer_manager::TimerId cancel_id = manager->add_timer(5, boost::bind(TimePrint(), _1, "timeout"), boost::bind(TimePrint(), _1, "cancel"));
 
 	boost::thread manager_thread(boost::ref(*manager));
+	for(int i=0; i<100; ++i) {
+		manager->add_timer(8, boost::bind(TimePrint(), _1, " multiple timeout timeouts at the same time"));
+	}
 	manager->add_timer(3, boost::bind(TimePrint(), _1, "timeout"));
 	manager->add_timer(6, boost::bind(TimePrint(), _1, "timeout"));
 	manager->add_timer(9, boost::bind(TimePrint(), _1, "timeout"));
@@ -81,8 +84,10 @@ int main(int argc, char** argv) {
 	manager->cancel_timer(cancel_id);
 	manager->add_timer(2, boost::bind(TimePrint(), _1, "timeout"));
 
-	sleep(10);
-
+	for(int i=0; i<10; ++i) {
+		cout << "main thread iteration: " << i << std::endl;
+		sleep(1);
+	}
 	//cout << "Stopping timer manager" << std::endl;
 	//manager->stop();
 	cout << "Joining manager thread" << std::endl;

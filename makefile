@@ -10,6 +10,9 @@ LDDFLAGS=
 timer_manager_test: test.o $(OBJECTS)
 	$(CXX) -o $@ $(LIBS_PATH) $(LIBS) $(FLAGS) $(LDDFLAGS) $< $(OBJECTS)
 
+%_run: %
+	@./$^
+
 .PHONY: clean
 clean:
 	@rm -rf *.core *.o timer_manager_test
