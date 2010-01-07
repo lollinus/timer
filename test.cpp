@@ -29,8 +29,8 @@ struct SelfExtend {
 		ssMessage << "timer " << id;
 		boost::shared_ptr<timer_manager> manager = manager_.lock();
 		if(manager) {
-			timer_manager::TimerId new_id = manager->add_timer(2, SelfExtend(manager));
-			ssMessage << ", extended timer(" << id << ") new_id(" << new_id << ")" << std::endl;
+			timer_handler new_timer = manager->add_timer(2, SelfExtend(manager));
+			ssMessage << ", extended timer(" << id << ") new_id(" << new_timer.id_ << ")" << std::endl;
 		} else {
 			ssMessage << ", Error manager pointer invalid" << std::endl;
 		}
@@ -67,7 +67,8 @@ int main(int argc, char** argv) {
 
 	manager->add_timer(1, boost::bind(TimePrint(), _1, "timeout"));
 	manager->add_timer(2, boost::bind(TimePrint(), _1, "timeout"), boost::bind(TimePrint(), _1, "cancel"));
-	timer_manager::TimerId cancel_id = manager->add_timer(5, boost::bind(TimePrint(), _1, "timeout"), boost::bind(TimePrint(), _1, "cancel"));
+	//timer_manager::TimerId cancel_id = manager->add_timer(5, boost::bind(TimePrint(), _1, "timeout"), boost::bind(TimePrint(), _1, "cancel"));
+	timer_handler timer = manager->add_timer(5, boost::bind(TimePrint(), _1, "timeout"), boost::bind(TimePrint(), _1, "cancel"));
 
 	boost::thread manager_thread(boost::ref(*manager));
 	for(int i=0; i<100; ++i) {
@@ -80,8 +81,8 @@ int main(int argc, char** argv) {
 	manager->add_timer(10, TimerManagerFinish(manager));
 	sleep(4);
 
-	cout << "cancelling timer " << cancel_id << std::endl;
-	manager->cancel_timer(cancel_id);
+	cout << "cancelling timer " << timer.id_ << std::endl;
+	timer.cancel();
 	manager->add_timer(2, boost::bind(TimePrint(), _1, "timeout"));
 
 	for(int i=0; i<10; ++i) {

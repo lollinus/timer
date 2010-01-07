@@ -1,0 +1,4 @@
+Simple timer manager which handles multiple timers with execution of passed action on timer event.
+
+TODO
+Implement timer_handler (look into boost::signal as reference)

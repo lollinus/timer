@@ -24,6 +24,9 @@
 struct timer;
 typedef boost::shared_ptr<timer> timer_ptr;
 
+// forward declarations
+struct timer_handler;
+
 class timer_manager : boost::noncopyable {
 public:
 	typedef unsigned long				TimerId;
@@ -52,7 +55,8 @@ public:
 	 * @param timeout_action to be executed when @a timeout is met
 	 * @return TimerId value which can be used to cancel timeout
 	 */
-	TimerId add_timer(Timeout timeout, Action const& action);
+	//TimerId add_timer(Timeout timeout, Action const& action);
+	timer_handler add_timer(Timeout timeout, Action const& action);
 	/**
 	 * @brief Add new timer with action to execute and action to execute in case of timer cancel
 	 * @param timeout value
@@ -60,7 +64,8 @@ public:
 	 * @param cancel_action to be executed when @f cancel_timer called
 	 * @return TimerId value which can be used to cancel timeout
 	 */
-	TimerId add_timer(Timeout timeout, Action const& action, Action const& cancel_action);
+	//TimerId add_timer(Timeout timeout, Action const& action, Action const& cancel_action);
+	timer_handler add_timer(Timeout timeout, Action const& action, Action const& cancel_action);
 	/**
 	 * @brief add new timer with action to execute
 	 * @param id timer id which should be cancelled
@@ -84,6 +89,18 @@ private:
 
 	mutable boost::mutex		manager_mutex_;	//!< mutex protecting internal timer_manager state
 	bool				is_stopping_;	//!< flag indicating that timer_manager is stopping
+};
+
+/** @struct timer_handler
+ *  @brief struct which is used as handler for timer.
+ */
+struct timer_handler {
+	timer_handler(timer_manager &tm, timer_manager::TimerId id);
+	~timer_handler();
+	void cancel();
+
+	timer_manager& tm_;
+	timer_manager::TimerId id_;
 };
 
 #endif // include guard

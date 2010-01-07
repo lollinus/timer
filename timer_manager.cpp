@@ -21,6 +21,14 @@ struct timer {
 	timer_manager::Action cancel_action;
 };
 
+timer_handler::timer_handler(timer_manager &tm, timer_manager::TimerId id)
+	: tm_(tm)
+	, id_(id) {}
+timer_handler::~timer_handler() {}
+void timer_handler::cancel() {
+	tm_.cancel_timer(id_);
+};
+
 timer_manager::timer_manager()
 	: timeouts_()
 	, last_timer_(0)
@@ -33,21 +41,17 @@ timer_manager::timer_manager()
 timer_manager::~timer_manager() {
 }
 
-timer_manager::TimerId timer_manager::add_timer(timer_manager::Timeout timeout, Action const& timeout_action) {
+timer_handler timer_manager::add_timer(timer_manager::Timeout timeout, Action const& timeout_action) {
 	return add_timer(timeout, timeout_action, 0);
 }
 
-timer_manager::TimerId timer_manager::add_timer(timer_manager::Timeout timeout, Action const& timeout_action, Action const& cancel_action) {
+timer_handler timer_manager::add_timer(timer_manager::Timeout timeout, Action const& timeout_action, Action const& cancel_action) {
 	boost::mutex::scoped_lock accessGuard(timeouts_mutex_);
 	timer_ptr p_timer(new timer(++last_timer_, timeout_action, cancel_action));
 	Timeout absolute_timeout = std::time(0) + timeout;
 	TimeoutMap::iterator timer_it = timeouts_.insert(std::make_pair(absolute_timeout, p_timer));
-//	std::cout << "add_timer(Timeout " << timeout << ", Action " << timeout_action << ")"
-//		  << " -> TimerId " << last_timer_
-//		  << " std::time(0) " << std::time(0)
-//		  << " timeout " << absolute_timeout << std::endl;
 	wait_condition_.notify_one();
-	return timer_it->second->id;
+	return timer_handler(*this, timer_it->second->id);
 }
 
 namespace {
@@ -96,7 +100,6 @@ void timer_manager::operator()() {
 		{ // check if timer manager is stopping
 		boost::mutex::scoped_lock stoppingLock(manager_mutex_);
 		if(is_stopping_) {
-			//cout << "Timer manager is stopping" << std::endl;
 			/// @todo call all left timeouts to notify consumers that operation is closing
 			return;
 		}
