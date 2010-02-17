@@ -69,29 +69,35 @@ private:
  *
  */
 struct timer_manager_deleter : std::unary_function<timer_manager*, void> {
-	timer_manager_deleter() : thread_(0) {};
+	timer_manager_deleter() : thread_() {};
 	void operator()(timer_manager* t) const {
+		using std::cout;
 		if(t) {
 			t->stop();
-			if(thread_) {
-				using std::cout;
+			boost::shared_ptr<boost::thread> th = thread_.lock();
+			if(th) {
 				cout << "Joining manager thread" << std::endl;
-				thread_->join();
+				th->join();
+			} else {
+				cout << "sleeping before deletion" << std::endl;
+				// sleep a little while to allow thead complete
+				sleep(2);
 			}
 			delete t;
 		}
 	}
 
-	void setThread(boost::thread* th) {
+	void setThread(boost::shared_ptr<boost::thread> th) {
 		thread_=th;
 	}
 
-	boost::thread* thread_;
+	boost::weak_ptr<boost::thread> thread_;
 };
 
 int main(int argc, char** argv) {
 	using namespace std;
 	// declare new timer_manager
+	boost::shared_ptr<boost::thread> manager_thread;
 	boost::shared_ptr<timer_manager> manager(new timer_manager, timer_manager_deleter());
 
 	manager->add_timer(1, boost::bind(TimePrint(), _1, "timeout"));
@@ -99,9 +105,9 @@ int main(int argc, char** argv) {
 	//timer_manager::TimerId cancel_id = manager->add_timer(5, boost::bind(TimePrint(), _1, "timeout"), boost::bind(TimePrint(), _1, "cancel"));
 	timer_handler timer = manager->add_timer(5, boost::bind(TimePrint(), _1, "timeout"), boost::bind(TimePrint(), _1, "cancel"));
 
-	boost::thread manager_thread(boost::ref(*manager));
+	manager_thread.reset(new boost::thread(boost::ref(*manager)));
 	if(timer_manager_deleter* d=boost::get_deleter<timer_manager_deleter>(manager)) {
-		d->setThread(&manager_thread);
+		d->setThread(manager_thread);
 	}
 	for(int i=0; i<100; ++i) {
 		manager->add_timer(8, boost::bind(TimePrint(), _1, " multiple timeout timeouts at the same time"));
@@ -121,7 +127,10 @@ int main(int argc, char** argv) {
 		cout << "main thread iteration: " << i << std::endl;
 		sleep(1);
 	}
-	manager.reset();
+	//if(timer_manager_deleter* d=boost::get_deleter<timer_manager_deleter>(manager)) {
+	//	d->setThread(0);
+	//}
+	//manager.reset();
 	//cout << "Joining manager thread" << std::endl;
 	//manager_thread.join();
 	cout << "Test programs finished" << std::endl;
