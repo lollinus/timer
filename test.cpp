@@ -61,15 +61,47 @@ private:
 	boost::weak_ptr<timer_manager> manager_;
 };
 
+/**
+ * @struct timer_manager_deleter
+ * @brief Simple deleter which can be used with boost::shared_ptr storing
+ * timer_manager instance. Before deleting object it will call stop on timer
+ * manager object to gracefully finish if it is executed by thread.
+ *
+ */
+struct timer_manager_deleter : std::unary_function<timer_manager*, void> {
+	timer_manager_deleter() : thread_(0) {};
+	void operator()(timer_manager* t) const {
+		if(t) {
+			t->stop();
+			if(thread_) {
+				using std::cout;
+				cout << "Joining manager thread" << std::endl;
+				thread_->join();
+			}
+			delete t;
+		}
+	}
+
+	void setThread(boost::thread* th) {
+		thread_=th;
+	}
+
+	boost::thread* thread_;
+};
+
 int main(int argc, char** argv) {
 	using namespace std;
-	boost::shared_ptr<timer_manager> manager(new timer_manager);
+	// declare new timer_manager
+	boost::shared_ptr<timer_manager> manager(new timer_manager, timer_manager_deleter());
 
 	manager->add_timer(1, boost::bind(TimePrint(), _1, "timeout"));
 	manager->add_timer(2, boost::bind(TimePrint(), _1, "timeout"), boost::bind(TimePrint(), _1, "cancel"));
 	timer_manager::TimerId cancel_id = manager->add_timer(5, boost::bind(TimePrint(), _1, "timeout"), boost::bind(TimePrint(), _1, "cancel"));
 
 	boost::thread manager_thread(boost::ref(*manager));
+	if(timer_manager_deleter* d=boost::get_deleter<timer_manager_deleter>(manager)) {
+		d->setThread(&manager_thread);
+	}
 	for(int i=0; i<100; ++i) {
 		manager->add_timer(8, boost::bind(TimePrint(), _1, " multiple timeout timeouts at the same time"));
 	}
@@ -77,7 +109,7 @@ int main(int argc, char** argv) {
 	manager->add_timer(6, boost::bind(TimePrint(), _1, "timeout"));
 	manager->add_timer(9, boost::bind(TimePrint(), _1, "timeout"));
 	manager->add_timer(1, SelfExtend(manager));
-	manager->add_timer(10, TimerManagerFinish(manager));
+	//manager->add_timer(10, TimerManagerFinish(manager));
 	sleep(4);
 
 	cout << "cancelling timer " << cancel_id << std::endl;
@@ -88,10 +120,9 @@ int main(int argc, char** argv) {
 		cout << "main thread iteration: " << i << std::endl;
 		sleep(1);
 	}
-	//cout << "Stopping timer manager" << std::endl;
-	//manager->stop();
-	cout << "Joining manager thread" << std::endl;
-	manager_thread.join();
+	manager.reset();
+	//cout << "Joining manager thread" << std::endl;
+	//manager_thread.join();
 	cout << "Test programs finished" << std::endl;
 	return 0;
 }
