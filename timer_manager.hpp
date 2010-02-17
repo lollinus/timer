@@ -47,7 +47,7 @@ public:
 
 public:
 	/**
-	 * @brief Add new timer with action to execute and action to execute in case of timer cancel
+	 * @brief Add new timer with action to execute
 	 * @param timeout value
 	 * @param timeout_action to be executed when @a timeout is met
 	 * @return TimerId value which can be used to cancel timeout
