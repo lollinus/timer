@@ -42,6 +42,10 @@ timer_manager::TimerId timer_manager::add_timer(timer_manager::Timeout timeout, 
 	timer_ptr p_timer(new timer(++last_timer_, timeout_action, cancel_action));
 	Timeout absolute_timeout = std::time(0) + timeout;
 	TimeoutMap::iterator timer_it = timeouts_.insert(std::make_pair(absolute_timeout, p_timer));
+//	std::cout << "add_timer(Timeout " << timeout << ", Action " << timeout_action << ")"
+//		  << " -> TimerId " << last_timer_
+//		  << " std::time(0) " << std::time(0)
+//		  << " timeout " << absolute_timeout << std::endl;
 	wait_condition_.notify_one();
 	return timer_it->second->id;
 }
@@ -63,14 +67,14 @@ bool timer_manager::cancel_timer(timer_manager::TimerId id) {
 	bool result = false;
 	Action a;
 	{ // mutex scope
-		boost::mutex::scoped_lock accessGuard(timeouts_mutex_);
-		TimeoutMap::iterator timer_it = find_if(timeouts_.begin(), timeouts_.end(), equal_id(id));
-		if(timer_it!=timeouts_.end()) {
-			Action a = timer_it->second->cancel_action;
-		}
-		timeouts_.erase(timer_it);
-		result = true;
-		wait_condition_.notify_one();
+	boost::mutex::scoped_lock accessGuard(timeouts_mutex_);
+	TimeoutMap::iterator timer_it = find_if(timeouts_.begin(), timeouts_.end(), equal_id(id));
+	if(timer_it!=timeouts_.end()) {
+		Action a = timer_it->second->cancel_action;
+	}
+	timeouts_.erase(timer_it);
+	result = true;
+	wait_condition_.notify_one();
 	}
 	// run action after releasing lock to avoid deadlock if action works on timer_manager
 	if(a) {
@@ -90,36 +94,36 @@ void timer_manager::operator()() {
 	using namespace std;
 	for(;;) {
 		{ // check if timer manager is stopping
-			boost::mutex::scoped_lock stoppingLock(manager_mutex_);
-			if(is_stopping_) {
-				//cout << "Timer manager is stopping" << std::endl;
-				/// @todo call all left timeouts to notify consumers that operation is closing
-				return;
-			}
+		boost::mutex::scoped_lock stoppingLock(manager_mutex_);
+		if(is_stopping_) {
+			//cout << "Timer manager is stopping" << std::endl;
+			/// @todo call all left timeouts to notify consumers that operation is closing
+			return;
+		}
 		}
 		TimeoutMap current_actions;
 		{ // opening scope for mutex
-			boost::mutex::scoped_lock accessGuard(timeouts_mutex_);
-			std::time_t now = time(0);
-			// read current timeouts and execute actions for them
-			std::pair<TimeoutIterator, TimeoutIterator> match_time = timeouts_.equal_range(now);
-			current_actions.insert(timeouts_.begin(), match_time.second);
-			timeouts_.erase(timeouts_.begin(), match_time.second);
+		boost::mutex::scoped_lock accessGuard(timeouts_mutex_);
+		std::time_t now = time(0);
+		// read current timeouts and execute actions for them
+		std::pair<TimeoutIterator, TimeoutIterator> match_time = timeouts_.equal_range(now);
+		current_actions.insert(timeouts_.begin(), match_time.second);
+		timeouts_.erase(timeouts_.begin(), match_time.second);
 		} // mutex is closed here so if running action is doing something on timer_manager it will nod deadlock
 		run_actions(current_actions);
 		{ // opening scope for mutex
-			boost::mutex::scoped_lock accessGuard(timeouts_mutex_);
-			/// @todo add check if time is not met for next timeout
-			if(!timeouts_.empty()) {
-				TimeoutIterator next_timeout_it = timeouts_.begin();
-				boost::xtime next_timeout;
-				next_timeout.sec = next_timeout_it->first;
-				wait_condition_.timed_wait(accessGuard, next_timeout);
-				//std::cout << "timed_wait wakeup " << std::time(0) << std::endl;
-			} else {
-				wait_condition_.wait(accessGuard);
-				//std::cout << "wait wakeup " << std::time(0) << std::endl;
-			}
+		boost::mutex::scoped_lock accessGuard(timeouts_mutex_);
+		/// @todo add check if time is not met for next timeout
+		if(!timeouts_.empty()) {
+			TimeoutIterator next_timeout_it = timeouts_.begin();
+			boost::xtime next_timeout;
+			next_timeout.sec = next_timeout_it->first;
+			wait_condition_.timed_wait(accessGuard, next_timeout);
+			//std::cout << "timed_wait wakeup " << std::time(0) << std::endl;
+		} else {
+			wait_condition_.wait(accessGuard);
+			//std::cout << "wait wakeup " << std::time(0) << std::endl;
+		}
 		}
 	}
 }
