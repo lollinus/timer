@@ -67,8 +67,10 @@ bool timer_manager::cancel_timer(timer_manager::TimerId id) {
 		TimeoutMap::iterator timer_it = find_if(timeouts_.begin(), timeouts_.end(), equal_id(id));
 		if(timer_it!=timeouts_.end()) {
 			Action a = timer_it->second->cancel_action;
+			timeouts_.erase(timer_it);
+		} else {
+			// log timer not found
 		}
-		timeouts_.erase(timer_it);
 		result = true;
 		wait_condition_.notify_one();
 	}
