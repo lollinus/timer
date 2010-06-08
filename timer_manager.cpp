@@ -130,7 +130,15 @@ void timer_manager::run_actions(TimeoutMap const& actions) const {
 	for(ConstTimeoutIterator action_it=actions.begin(); action_it!=actions.end(); ++action_it) {
 		Action a = action_it->second->timeout_action;
 		if(a) {
-			a(action_it->second->id);
+			try {
+				a(action_it->second->id);
+			} catch(std::exeception const& e) {
+				// log error
+				std::cerr << "Exception caught while running timer action: " << e.what() << std::endl;
+			} catch(...) {
+				// log error
+				std::cerr << "Unknown exception caught";
+			}
 		}
 	}
 }
